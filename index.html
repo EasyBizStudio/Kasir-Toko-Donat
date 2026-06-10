@@ -47,6 +47,15 @@
     
     /* STYLE KHUSUS PRINT STRUK THERMAL 58mm */
     @media print {
+      /* Mengatur browser agar menggunakan layout kertas struk gulungan roll secara penuh */
+      @page {
+        size: 58mm auto;
+        margin: 0mm;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
       body * { 
         visibility: hidden; 
       }
@@ -57,13 +66,14 @@
         position: absolute;
         left: 0;
         top: 0;
-        width: 58mm;
+        width: 100%;
+        max-width: 58mm; /* Memaksa lebar maksimal sesuai ukuran kertas thermal */
         padding: 2mm;
         background: white;
         color: black;
         font-family: 'Courier New', Courier, monospace !important;
-        font-size: 11px;
-        line-height: 1.2;
+        font-size: 14px; /* Ukuran font diperbesar menjadi 14px sesuai saran untuk thermal */
+        line-height: 1.35;
       }
       .no-print { 
         display: none !important; 
@@ -334,10 +344,16 @@
 
     // Setup Awal Aplikasi saat dimuat
     window.onload = function() {
-      menuItems = JSON.parse(localStorage.getItem('v4_donut_menu')) || [];
-      transactions = JSON.parse(localStorage.getItem('v4_donut_tx')) || [];
+      try {
+        menuItems = JSON.parse(localStorage.getItem('v4_donut_menu')) || [];
+        transactions = JSON.parse(localStorage.getItem('v4_donut_tx')) || [];
+      } catch (err) {
+        console.error("Local storage error:", err);
+      }
       updateAppUI();
-      lucide.createIcons();
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
     };
 
     function saveToStorage() {
@@ -377,15 +393,17 @@
     }
 
     // Navigasi Tab Utama
-    function switchTab(tabId) {
+    window.switchTab = function(tabId) {
       activeTab = tabId;
-      ['cashier', 'menu_setup', 'history'].forEach(t => {
-        const btn = document.getElementById(`nav-${t}`);
-        const sec = document.getElementById(`tab-content-${t}`);
-        if (t === tabId) {
+      ['cashier', 'menu_setup', 'history'].forEach(tabKey => {
+        const btn = document.getElementById(`nav-${tabKey}`);
+        const sec = document.getElementById(`tab-content-${tabKey}`);
+        if (!btn || !sec) return;
+        
+        if (tabKey === tabId) {
           btn.className = "flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all bg-white text-rose-600 shadow-xs";
           sec.classList.remove('hidden');
-          if (t === 'menu_setup') sec.classList.add('grid');
+          if (tabKey === 'menu_setup') sec.classList.add('grid');
         } else {
           btn.className = "flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all text-amber-900/80 hover:bg-white/40";
           sec.classList.add('hidden');
@@ -393,9 +411,9 @@
         }
       });
       updateAppUI();
-    }
+    };
 
-    function switchMobilePOSView(viewId) {
+    window.switchMobilePOSView = function(viewId) {
       posMobileView = viewId;
       const mBtn = document.getElementById('btn-mobile-view-menu');
       const cBtn = document.getElementById('btn-mobile-view-cart');
@@ -412,7 +430,7 @@
         mCol.className = "hidden md:block md:col-span-7 lg:col-span-8 space-y-4";
         cCol.className = "flex md:col-span-5 lg:col-span-4 bg-white border border-orange-100/80 rounded-3xl overflow-hidden flex-col sticky top-20 w-full";
       }
-    }
+    };
 
     // Core UI Renderer Orchestrator
     function updateAppUI() {
@@ -420,12 +438,14 @@
       if (activeTab === 'cashier') { renderPOSMenu(); renderPOSCart(); }
       else if (activeTab === 'menu_setup') { renderMenuSetupTable(); }
       else if (activeTab === 'history') { buildSepranAnalytics(); }
-      lucide.createIcons();
+      
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // POS ENGINE
     function renderPOSMenu() {
       const grid = document.getElementById('pos-menu-grid');
+      if (!grid) return;
       if (menuItems.length === 0) {
         grid.innerHTML = `<div class="col-span-full bg-white border border-dashed border-amber-200 rounded-3xl p-8 text-center text-xs font-semibold text-amber-800/50"><br><br>Database kosong. Silakan tambahkan menu jualan terlebih dahulu di tab 'Atur Menu'.</div>`;
         return;
@@ -451,6 +471,7 @@
       const rBtn = document.getElementById('btn-reset-order');
       const paySec = document.getElementById('payment-section');
       const totalDisp = document.getElementById('cart-total-display');
+      if (!container || !totalDisp) return;
       
       const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       totalDisp.innerText = formatIDR(subtotal);
@@ -483,34 +504,34 @@
       
       document.getElementById('input-cash-amount').oninput = calculateChange;
       calculateChange();
-      lucide.createIcons();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    function addToCart(id) {
+    window.addToCart = function(id) {
       const item = menuItems.find(i => i.id === id);
       if (!item) return;
       const exist = cart.find(c => c.id === id);
       if (exist) exist.quantity += 1; else cart.push({ ...item, quantity: 1 });
       updateAppUI();
-    }
+    };
 
-    function updateCartQty(id, delta) {
+    window.updateCartQty = function(id, delta) {
       const exist = cart.find(c => c.id === id);
       if (!exist) return;
       exist.quantity += delta;
       if (exist.quantity <= 0) cart = cart.filter(c => c.id !== id);
       updateAppUI();
-    }
+    };
 
-    function resetOrderWithConfirm() {
+    window.resetOrderWithConfirm = function() {
       triggerConfirm('Reset Order', 'Kosongkan isi keranjang?', () => { cart = []; updateAppUI(); });
-    }
+    };
 
-    function setCashPreset(val) {
+    window.setCashPreset = function(val) {
       const subtotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       document.getElementById('input-cash-amount').value = val === 'exact' ? subtotal : val;
       calculateChange();
-    }
+    };
 
     function calculateChange() {
       const subtotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
@@ -524,7 +545,7 @@
     }
 
     // CHECKOUT PIPELINE
-    function processCheckout() {
+    window.processCheckout = function() {
       const subtotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       const cash = parseFloat(document.getElementById('input-cash-amount').value) || 0;
       const cName = document.getElementById('input-customer-name').value.trim() || 'Pelanggan Umum';
@@ -557,50 +578,52 @@
 
       // Buka Gerbang Pilihan Struk Dialog
       document.getElementById('receipt-action-modal').classList.remove('hidden');
-    }
+    };
 
-    function closeReceiptModal() {
+    window.closeReceiptModal = function() {
       document.getElementById('receipt-action-modal').classList.add('hidden');
       lastGeneratedTx = null;
-    }
+    };
 
     // PRINT STRUK FISIK (WINDOW.PRINT)
-    function triggerThermalPrint() {
+    window.triggerThermalPrint = function() {
       if (!lastGeneratedTx) return;
       const tx = lastGeneratedTx;
       const timeStr = new Date(tx.timestamp).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
       
       let itemLines = tx.items.map(it => {
-        let nameLine = it.name.slice(0, 24);
+        // Membatasi panjang nama item maksimal 20 karakter agar tidak melebihi lebar kertas 58mm pada font 14px
+        let nameLine = it.name.length > 20 ? it.name.slice(0, 18) + '..' : it.name;
         let qtyPrice = `${it.quantity}x ${formatIDR(it.price)}`;
         let sub = formatIDR(it.price * it.quantity);
-        return `${nameLine}\n ${qtyPrice.padEnd(14)} ${sub.padStart(10)}`;
+        // PadEnd dan PadStart disesuaikan dengan proporsi lebar
+        return `${nameLine}\n ${qtyPrice.padEnd(16)} ${sub.padStart(10)}`;
       }).join('\n');
 
       const receiptHTML = `
-        <div style="text-align: center; font-weight: bold; margin-bottom: 4px;">KASIR DONAT</div>
-        <div style="text-align: center; font-size: 9px; margin-bottom: 8px;">Kawasan Kuliner Kota</div>
+        <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 4px;">KASIR DONAT</div>
+        <div style="text-align: center; font-size: 12px; margin-bottom: 8px;">Kawasan Kuliner Kota</div>
         <div style="border-bottom: 1px dashed black; margin-bottom: 4px;"></div>
         <div>ID   : ${tx.id}</div>
         <div>Tgl  : ${timeStr}</div>
         <div>Kasir: Admin</div>
         <div>Cust : ${tx.customer}</div>
         <div style="border-bottom: 1px dashed black; margin-top: 4px; margin-bottom: 4px;"></div>
-        <pre style="margin: 0; font-family: inherit; font-size: 11px;">${itemLines}</pre>
+        <pre style="margin: 0; font-family: inherit; font-size: 14px; white-space: pre-wrap;">${itemLines}</pre>
         <div style="border-bottom: 1px dashed black; margin-top: 4px; margin-bottom: 4px;"></div>
-        <div style="display: flex; justify-content: space-between;"><span>TOTAL:</span><strong>${formatIDR(tx.subtotal)}</strong></div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold;"><span>TOTAL:</span><span>${formatIDR(tx.subtotal)}</span></div>
         <div style="display: flex; justify-content: space-between;"><span>BAYAR:</span><span>${formatIDR(tx.paid)}</span></div>
         <div style="display: flex; justify-content: space-between;"><span>KEMBALI:</span><span>${formatIDR(tx.change)}</span></div>
         <div style="border-bottom: 1px dashed black; margin-top: 4px; margin-bottom: 4px;"></div>
-        <div style="text-align: center; font-size: 9px; margin-top: 8px; font-weight: bold;">TERIMA KASIH</div>
+        <div style="text-align: center; font-size: 12px; margin-top: 8px; font-weight: bold;">TERIMA KASIH</div>
       `;
 
       document.getElementById('section-to-print').innerHTML = receiptHTML;
       window.print();
-    }
+    };
 
     // FORMAT NOTA TEKS UNTUK DIKIRIM KE WHATSAPP
-    function triggerWhatsAppShare() {
+    window.triggerWhatsAppShare = function() {
       if (!lastGeneratedTx) return;
       const tx = lastGeneratedTx;
       const timeStr = new Date(tx.timestamp).toLocaleString('id-ID');
@@ -624,10 +647,10 @@
 
       const targetURL = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(teks)}`;
       window.open(targetURL, '_blank');
-    }
+    };
 
     // KONFIGURASI ATUR MENU
-    function setFormCategory(cat) {
+    window.setFormCategory = function(cat) {
       formCategory = cat;
       const dBtn = document.getElementById('btn-category-donut');
       const bBtn = document.getElementById('btn-category-beverage');
@@ -638,9 +661,9 @@
         bBtn.className = "py-2 px-3 rounded-xl text-xs font-bold border bg-rose-50 text-rose-700 border-rose-300";
         dBtn.className = "py-2 px-3 rounded-xl text-xs font-bold border bg-white text-darkamber border-amber-200";
       }
-    }
+    };
 
-    function handleMenuSubmit(e) {
+    window.handleMenuSubmit = function(e) {
       e.preventDefault();
       const name = document.getElementById('input-menu-name').value.trim();
       const price = parseInt(document.getElementById('input-menu-price').value) || 0;
@@ -660,13 +683,15 @@
       document.getElementById('btn-submit-menu').innerText = "Simpan Menu";
       setFormCategory('donut');
       updateAppUI();
-    }
+    };
 
     function renderMenuSetupTable() {
       const msg = document.getElementById('menu-db-empty');
       const tbl = document.getElementById('menu-db-table');
       const body = document.getElementById('menu-db-table-body');
       
+      if (!msg || !tbl || !body) return;
+
       if (menuItems.length === 0) { msg.classList.remove('hidden'); tbl.classList.add('hidden'); return; }
       msg.classList.add('hidden'); tbl.classList.remove('hidden');
 
@@ -683,7 +708,7 @@
       `).join('');
     }
 
-    function editMenu(id) {
+    window.editMenu = function(id) {
       const item = menuItems.find(m => m.id === id);
       if (!item) return;
       document.getElementById('edit-item-id').value = item.id;
@@ -692,36 +717,38 @@
       document.getElementById('menu-form-title').innerText = "Edit Menu Jualan";
       document.getElementById('btn-submit-menu').innerText = "Simpan Perubahan";
       setFormCategory(item.category);
-    }
+    };
 
-    function deleteMenu(id) {
+    window.deleteMenu = function(id) {
       triggerConfirm('Hapus Produk', 'Hapus item ini dari database selamanya?', () => {
         menuItems = menuItems.filter(m => m.id !== id);
         cart = cart.filter(c => c.id !== id);
         updateAppUI();
       });
-    }
+    };
 
     // SEPRAN STYLE ANALYTICS ENGINE
-    function setAnalyticsFilter(type) {
+    window.setAnalyticsFilter = function(type) {
       analyticsFilter = type;
       ['day', 'week', 'month'].forEach(f => {
         const btn = document.getElementById(`filter-btn-${f}`);
-        btn.className = f === type ? "px-4 py-2 text-xs font-bold rounded-xl bg-amber-950 text-white shadow-xs" : "px-4 py-2 text-xs font-bold rounded-xl bg-white border border-amber-200";
+        if(btn) btn.className = f === type ? "px-4 py-2 text-xs font-bold rounded-xl bg-amber-950 text-white shadow-xs" : "px-4 py-2 text-xs font-bold rounded-xl bg-white border border-amber-200";
       });
-      document.getElementById('filter-custom-month').value = '';
+      const customMonth = document.getElementById('filter-custom-month');
+      if(customMonth) customMonth.value = '';
       buildSepranAnalytics();
-    }
+    };
 
-    function handleCustomMonthChange() {
+    window.handleCustomMonthChange = function() {
       const val = document.getElementById('filter-custom-month').value;
       if (!val) return;
       analyticsFilter = 'custom';
       ['day', 'week', 'month'].forEach(f => {
-        document.getElementById(`filter-btn-${f}`).className = "px-4 py-2 text-xs font-bold rounded-xl bg-white border border-amber-200";
+        const btn = document.getElementById(`filter-btn-${f}`);
+        if(btn) btn.className = "px-4 py-2 text-xs font-bold rounded-xl bg-white border border-amber-200";
       });
       buildSepranAnalytics();
-    }
+    };
 
     function filterTransactionsByTime() {
       const now = new Date();
@@ -750,7 +777,7 @@
     function buildSepranAnalytics() {
       const filtered = filterTransactionsByTime();
       
-      const totalRevenue = filtered.reduce((sum, t) => sum + t.subtotal, 0);
+      const totalRevenue = filtered.reduce((sum, txData) => sum + txData.subtotal, 0);
       const totalTxCount = filtered.length;
       
       let totalItemsCount = 0;
@@ -794,40 +821,44 @@
         `).join('');
       }
 
-      // INTEGRASI SEPRAN DOUGHNUT CHART ENGINE
-      const ctx = document.getElementById('sepranDoughnutChart').getContext('2d');
-      if (chartInstance) { chartInstance.destroy(); }
+      const canvasEl = document.getElementById('sepranDoughnutChart');
+      if(canvasEl && typeof Chart !== 'undefined') {
+        const ctx = canvasEl.getContext('2d');
+        if (chartInstance) { chartInstance.destroy(); }
 
-      const chartLabels = productSalesArray.map(p => p.name);
-      const chartData = productSalesArray.map(p => p.count);
-      const donutColors = ['#F43F5E', '#FB923C', '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#F472B6', '#94A3B8'];
+        const chartLabels = productSalesArray.map(p => p.name);
+        const chartData = productSalesArray.map(p => p.count);
+        const donutColors = ['#F43F5E', '#FB923C', '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#F472B6', '#94A3B8'];
 
-      chartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: chartLabels,
-          datasets: [{
-            data: chartData,
-            backgroundColor: donutColors.slice(0, chartLabels.length),
-            borderWidth: 2,
-            borderColor: '#ffffff'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
+        chartInstance = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: chartLabels,
+            datasets: [{
+              data: chartData,
+              backgroundColor: donutColors.slice(0, chartLabels.length),
+              borderWidth: 2,
+              borderColor: '#ffffff'
+            }]
           },
-          cutout: '65%'
-        }
-      });
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            cutout: '65%'
+          }
+        });
+      }
 
       renderHistoryLogList();
     }
 
     function renderHistoryLogList() {
       const container = document.getElementById('history-log-list');
+      if (!container) return;
+      
       if (transactions.length === 0) {
         container.innerHTML = `<div class="p-6 text-center text-xs text-amber-800/40 font-semibold">Belum ada struk penjualan tersimpan</div>`;
         return;
@@ -854,25 +885,25 @@
           </div>
         `;
       }).join('');
-      lucide.createIcons();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    function deleteTransaction(id) {
+    window.deleteTransaction = function(id) {
       triggerConfirm('Hapus Struk Jurnal', 'Hapus pencatatan transaksi ini secara permanen?', () => {
-        transactions = transactions.filter(t => t.id !== id);
+        transactions = transactions.filter(txData => txData.id !== id);
         updateAppUI();
       });
-    }
+    };
 
-    function clearAllTransactions() {
+    window.clearAllTransactions = function() {
       triggerConfirm('Kosongkan Jurnal', 'Hapus total seluruh riwayat data transaksi toko?', () => {
         transactions = [];
         updateAppUI();
       });
-    }
+    };
 
     // EKSPOR LAPORAN KE EXCEL (CSV)
-    function exportToCSV() {
+    window.exportToCSV = function() {
       if (transactions.length === 0) { showNotification('Tidak ada data untuk diunduh', 'error'); return; }
       
       let csvContent = "data:text/csv;charset=utf-8,ID Transaksi,Waktu,Nama Pelanggan,No WA,Total Belanja,Uang Tunai,Kembalian,Daftar Produk\n";
@@ -903,7 +934,7 @@
       link.click();
       document.body.removeChild(link);
       showNotification('Laporan siap diunduh');
-    }
+    };
   </script>
 </body>
 </html>
